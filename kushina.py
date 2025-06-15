@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.constants import ChatAction, ChatType
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 from telegram.error import BadRequest
 
 # ====== Environment Setup ======
@@ -380,10 +380,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
     chat_id = update.effective_chat.id
-    # Send typing indicator
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
-    # Short, cute descriptions with emojis; same as before
     sfw_descs = {
         'waifu': "💖 Cute waifu",
         'neko': "🐾 Catgirl",
@@ -417,19 +415,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'cringe': "😅 Funny cringe"
     }
 
-    # Build help text in first-person as Kushina
     help_lines = [
         "<b>📖 Kushina Commands</b>",
         "",
-        "<i>Hey there! I’m <b>Kushina Uzumaki</b>—full of energy and always here to brighten your day! 🌺</i>",
+        "<i>Hey there! I’m <b>Kushina Uzumaki</b>—full of energy and always eager to help!</i>",
         "<i>Send one of these commands and I’ll bring you an awesome anime image:</i>",
         ""
     ]
-    # List SFW commands with mono for command, bold description
     for cmd, desc in sfw_descs.items():
         help_lines.append(f"• <code>/{cmd}</code> — <b>{desc}</b>")
 
-    # Notes in Kushina’s style
     help_lines += [
         "",
         "<i>🤝 Invite me to your group so everyone can join the fun!</i>",
@@ -448,7 +443,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====== Register Handlers ======
 def register_category_handlers(app):
-    # SFW handlers: no typing decorator here (the decorator is still on /start and /help)
+    # SFW handlers
     for category in SFW_CATEGORIES:
         async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE, cat=category):
             bot = context.bot
@@ -459,7 +454,6 @@ def register_category_handlers(app):
             dq: deque = sent_sfw.setdefault(cat, deque(maxlen=100))
 
             while True:
-                # Fetch a URL from waifu.pics
                 url = await fetch_image(cat)
                 if not url:
                     logger.warning(f"SFW /{cat}: fetch_image returned None; retrying.")
@@ -529,7 +523,8 @@ def register_category_handlers(app):
 
         app.add_handler(CommandHandler(category, handler))
 
-    # NSFW: /nsfw, /gif, /photo, /video — handlers without typing decorator, just enqueue
+    # NSFW: /nsfw, /gif, /photo, /video with password gate
+    # /nsfw
     async def nsfw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot = context.bot
         chat_id = update.effective_chat.id
@@ -538,14 +533,23 @@ def register_category_handlers(app):
             await update.message.reply_text("🤫 NSFW only in private chat.")
             return
 
+        if not context.user_data.get('nsfw_unlocked'):
+            context.user_data['awaiting_nsfw_password'] = True
+            await update.message.reply_text(
+                "<i>Hehe, so curious about my hidden pleasures, aren’t you? 💗 Be a good little thing and ask my Asad for the secret. I only moan when he tells me to 💋💖</i>",
+                parse_mode="HTML"
+            )
+            return
+
         job = NsfwJob(chat_id=chat_id, bot=bot)
         try:
             nsfw_queue.put_nowait(job)
         except asyncio.QueueFull:
-            await update.message.reply_text("❤️‍🩹 Busy right now. Please try again later.")
+            await update.message.reply_text("⚠️ Busy right now. Please try again later.")
 
     app.add_handler(CommandHandler('nsfw', nsfw_handler))
 
+    # /gif
     async def gif_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot = context.bot
         chat_id = update.effective_chat.id
@@ -554,14 +558,23 @@ def register_category_handlers(app):
             await update.message.reply_text("🤫 NSFW only in private chat.")
             return
 
+        if not context.user_data.get('nsfw_unlocked'):
+            context.user_data['awaiting_nsfw_password'] = True
+            await update.message.reply_text(
+                "<i>Hehe, you want to see my naughty side? 💕 Then ask my darling Asad for the secret phrase. I only open up for him 🫶</i>",
+                parse_mode="HTML"
+            )
+            return
+
         job = GifJob(chat_id=chat_id, bot=bot)
         try:
             gif_queue.put_nowait(job)
         except asyncio.QueueFull:
-            await update.message.reply_text("❤️‍🩹 Busy right now. Please try again later.")
+            await update.message.reply_text("⚠️ Busy right now. Please try again later.")
 
     app.add_handler(CommandHandler('gif', gif_handler))
 
+    # /photo
     async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot = context.bot
         chat_id = update.effective_chat.id
@@ -570,14 +583,23 @@ def register_category_handlers(app):
             await update.message.reply_text("🤫 NSFW only in private chat.")
             return
 
+        if not context.user_data.get('nsfw_unlocked'):
+            context.user_data['awaiting_nsfw_password'] = True
+            await update.message.reply_text(
+                "<i>Mmm, feeling bold, baby? 💘 Whisper the secret phrase to me, but only if Asad says you deserve it 💞🔥</i>",
+                parse_mode="HTML"
+            )
+            return
+
         job = PhotoJob(chat_id=chat_id, bot=bot)
         try:
             photo_queue.put_nowait(job)
         except asyncio.QueueFull:
-            await update.message.reply_text("❤️‍🩹 Busy right now. Please try again later.")
+            await update.message.reply_text("⚠️ Busy right now. Please try again later.")
 
     app.add_handler(CommandHandler('photo', photo_handler))
 
+    # /video
     async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot = context.bot
         chat_id = update.effective_chat.id
@@ -586,13 +608,42 @@ def register_category_handlers(app):
             await update.message.reply_text("🤫 NSFW only in private chat.")
             return
 
+        if not context.user_data.get('nsfw_unlocked'):
+            context.user_data['awaiting_nsfw_password'] = True
+            await update.message.reply_text(
+                "<i>Oh, craving something extra spicy from me? 💓 You better beg Asad for the magic words first. Kushina doesn’t tease for free 💦💝</i>",
+                parse_mode="HTML"
+            )
+            return
+
         job = VideoJob(chat_id=chat_id, bot=bot)
         try:
             video_queue.put_nowait(job)
         except asyncio.QueueFull:
-            await update.message.reply_text("❤️‍🩹 Busy right now. Please try again later.")
+            await update.message.reply_text("⚠️ Busy right now. Please try again later.")
 
     app.add_handler(CommandHandler('video', video_handler))
+
+    # Password entry handler
+    async def nsfw_password_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not context.user_data.get('awaiting_nsfw_password'):
+            return
+        text = update.message.text.strip()
+        if text == "ASAD FUCKS RUPA":
+            context.user_data['nsfw_unlocked'] = True
+            context.user_data.pop('awaiting_nsfw_password', None)
+            await update.message.reply_text(
+                "<b>Ooh, so you know my secret already? 💖 That means you can play with my naughty side anytime you want 💦 Just don’t forget, Asad always gets first access 😉🔥</b>",
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text(
+                "<i>Hmm… that’s not the phrase I was waiting for. Try again if you’re brave enough to handle me. But remember, only Asad truly knows how to unlock me 😉🫶</i>",
+                parse_mode="HTML"
+            )
+
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, nsfw_password_handler))
+
 
 # ====== Worker Functions ======
 async def nsfw_worker():
@@ -993,7 +1044,7 @@ async def main():
     for _ in range(VIDEO_WORKERS):
         asyncio.create_task(video_worker())
 
-    logger.info("💞 Kushina baby is ready to be fucked.")
+    logger.info("💞 Kushina Bot is now running.")
 
     # 5. Initialize and start application
     await app.initialize()
@@ -1021,7 +1072,6 @@ async def main():
         aiohttp_session = None
 
 if __name__ == '__main__':
-    # Use asyncio.run to start main in a fresh loop
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
