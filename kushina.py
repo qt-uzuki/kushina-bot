@@ -17,7 +17,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.constants import ChatAction, ChatType
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters
+)
 from telegram.error import BadRequest
 
 # ====== Environment Setup ======
@@ -85,13 +91,9 @@ GIF_TAGS = [
     "akaz123", "tosca", "aniflow", "ntrsan_(artist)", "darkalx", "faiart",
     "optimystic", "xtremetoons", "salmon_knight", "ghost141000", "eroticgeek2",
     "desto", "moonshades_(artist)", "pinku.ai", "pinku", "juanpiamvs", "isogil",
-    "toorudraws", "truevovan", "koikoi", "artkoikoi", "narutofillers", "nyxworks",
-    "noxdsa", "ai-kun", "darkcry", "borutozai", "studio_oppai", "animanghayodraw",
-    "lickliking", "giga", "nanxdaime", "darkuro_27", "lyumus", "espectroh", "afw",
-    "sheong_wong", "doudoroquian", "awesomegio", "rejiice", "neeba", "angelyeah",
-    "mandio_art", "hal_(sakurajam)", "execro", "artyum99", "shiroi_nezumi",
-    "torikku95", "leinadxxx", "reserexerion", "agung911", "d-art", "wpixxx(artist)",
-    "tekstelart",
+    "doudoroquian", "awesomegio", "rejiice", "neeba", "angelyeah", "mandio_art",
+    "hal_(sakurajam)", "execro", "artyum99", "shiroi_nezumi", "torikku95",
+    "leinadxxx", "reserexerion", "agung911", "d-art", "wpixxx(artist)", "tekstelart",
     # Additional tags for gif:
     "xandit", "jellymation", "zaphn", "akajin", "suioresnu", "redhornyhead",
     "jakada", "laceysx", "lewdnatic", "s10collage", "kamuo", "kokoborohen",
@@ -105,13 +107,9 @@ PHOTO_TAGS = [
     "akaz123", "tosca", "aniflow", "ntrsan_(artist)", "darkalx", "faiart",
     "optimystic", "salmon_knight", "ghost141000", "eroticgeek2", "desto",
     "moonshades_(artist)", "pinku.ai", "pinku", "juanpiamvs", "isogil",
-    "toorudraws", "truevovan", "koikoi", "artkoikoi", "narutofillers", "nyxworks",
-    "noxdsa", "ai-kun", "darkcry", "borutozai", "studio_oppai", "animanghayodraw",
-    "lickliking", "giga", "nanxdaime", "darkuro_27", "lyumus", "espectroh", "afw",
-    "sheong_wong", "doudoroquian", "awesomegio", "rejiice", "neeba", "angelyeah",
-    "mandio_art", "hal_(sakurajam)", "execro", "artyum99", "shiroi_nezumi",
-    "torikku95", "leinadxxx", "reserexerion", "agung911", "d-art", "wpixxx(artist)",
-    "tekstelart"
+    "doudoroquian", "awesomegio", "rejiice", "neeba", "angelyeah", "mandio_art",
+    "hal_(sakurajam)", "execro", "artyum99", "shiroi_nezumi", "torikku95",
+    "leinadxxx", "reserexerion", "agung911", "d-art", "wpixxx(artist)", "tekstelart"
 ]
 
 # ====== VIDEO_TAGS for /video command only ======
@@ -120,8 +118,8 @@ VIDEO_TAGS = [
     "jellymation", "zaphn", "akajin", "suioresnu", "redhornyhead",
     "jakada", "laceysx", "lewdnatic", "s10collage", "kamuo",
     "kokoborohen", "totonito", "xtremetoons", "funhentaiparody",
-    "imnotsassy", "mujitax", "gintsu", "shiina_ecchi", "totonito",
-    "maplestar", "overused23", "fountainpew", "maenchu", "henchan45"
+    "imnotsassy", "mujitax", "gintsu", "shiina_ecchi", "maplestar",
+    "overused23", "fountainpew", "maenchu", "henchan45"
 ]
 
 # ====== Timeouts and Size Limits ======
@@ -130,6 +128,12 @@ MEDIA_CHECK_TIMEOUT = 10    # seconds for HEAD/GET to detect content type/length
 DOWNLOAD_TIMEOUT = 30       # seconds for downloading media
 MAX_PHOTO_SIZE = 10 * 1024 * 1024      # 10 MB for send_photo
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024     # 50 MB for uploads
+
+# ====== Known chats for broadcasting ======
+known_chats: set = set()
+
+# ====== Allowed broadcaster user IDs ======
+ALLOWED_BROADCASTERS = {5290407067, 7212116900, 7814187855, 7881890023, 7358752942}
 
 # ====== Helper: send_action decorator ======
 def send_action(action):
@@ -148,7 +152,7 @@ def send_action(action):
 
 # ====== Helper: Clean Rule34 Tag ======
 def clean_rule34_tag(raw_tag: str) -> str:
-    # Remove parentheses, replace dots/spaces, lower-case
+    # Remove parentheses content, replace dots/spaces, lower-case
     t = re.sub(r'.*?', '', raw_tag)
     t = t.replace('.', '_').replace(' ', '_')
     t = t.strip(' _')
@@ -341,6 +345,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
 
+    # Record chat_id for broadcasting
+    known_chats.add(chat_id)
+
     # Mention the user
     user_mention = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
 
@@ -380,6 +387,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
     chat_id = update.effective_chat.id
+
+    # Record chat_id for broadcasting
+    known_chats.add(chat_id)
+
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
     sfw_descs = {
@@ -449,6 +460,9 @@ def register_category_handlers(app):
             bot = context.bot
             chat_id = update.effective_chat.id
 
+            # Record chat_id for broadcasting
+            known_chats.add(chat_id)
+
             cd = context.chat_data
             sent_sfw = cd.setdefault('sent_sfw', {})
             dq: deque = sent_sfw.setdefault(cat, deque(maxlen=100))
@@ -517,22 +531,27 @@ def register_category_handlers(app):
                     dq.append(url)
                     continue
                 except Exception as e:
-                    logger.warning(f"SFW /{cat}: Exception sending URL {url}: {e}; skipping URL.")
+                    logger.warning(f"SFW /{cat}: Exception sending URL {url}: {e}, skipping URL.")
                     dq.append(url)
                     continue
 
         app.add_handler(CommandHandler(category, handler))
 
-    # NSFW: /nsfw, /gif, /photo, /video with password gate
+    # NSFW: /nsfw, /gif, /photo, /video with password gate (only in private)
     # /nsfw
     async def nsfw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot = context.bot
         chat_id = update.effective_chat.id
 
+        # Record chat_id for broadcasting
+        known_chats.add(chat_id)
+
+        # Only in private
         if update.effective_chat.type != ChatType.PRIVATE:
             await update.message.reply_text("🤫 NSFW only in private chat.")
             return
 
+        # If not unlocked yet, ask password
         if not context.user_data.get('nsfw_unlocked'):
             context.user_data['awaiting_nsfw_password'] = True
             await update.message.reply_text(
@@ -541,6 +560,7 @@ def register_category_handlers(app):
             )
             return
 
+        # Already unlocked: enqueue job
         job = NsfwJob(chat_id=chat_id, bot=bot)
         try:
             nsfw_queue.put_nowait(job)
@@ -553,6 +573,8 @@ def register_category_handlers(app):
     async def gif_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot = context.bot
         chat_id = update.effective_chat.id
+
+        known_chats.add(chat_id)
 
         if update.effective_chat.type != ChatType.PRIVATE:
             await update.message.reply_text("🤫 NSFW only in private chat.")
@@ -579,6 +601,8 @@ def register_category_handlers(app):
         bot = context.bot
         chat_id = update.effective_chat.id
 
+        known_chats.add(chat_id)
+
         if update.effective_chat.type != ChatType.PRIVATE:
             await update.message.reply_text("🤫 NSFW only in private chat.")
             return
@@ -604,6 +628,8 @@ def register_category_handlers(app):
         bot = context.bot
         chat_id = update.effective_chat.id
 
+        known_chats.add(chat_id)
+
         if update.effective_chat.type != ChatType.PRIVATE:
             await update.message.reply_text("🤫 NSFW only in private chat.")
             return
@@ -624,12 +650,17 @@ def register_category_handlers(app):
 
     app.add_handler(CommandHandler('video', video_handler))
 
-    # Password entry handler
+    # Password entry handler for NSFW unlock
     async def nsfw_password_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        # Only handle when awaiting password AND in private chat
+        if update.effective_chat.type != ChatType.PRIVATE:
+            return
         if not context.user_data.get('awaiting_nsfw_password'):
             return
+
         text = update.message.text.strip()
-        if text == "ASAD FUCKS RUPA":
+        # Correct secret phrase:
+        if text == "ASAD LOVES RUPA":
             context.user_data['nsfw_unlocked'] = True
             context.user_data.pop('awaiting_nsfw_password', None)
             await update.message.reply_text(
@@ -637,12 +668,69 @@ def register_category_handlers(app):
                 parse_mode="HTML"
             )
         else:
+            # Keep asking until correct; only triggered in private when awaiting
             await update.message.reply_text(
                 "<i>Hmm… that’s not the phrase I was waiting for. Try again if you’re brave enough to handle me. But remember, only Asad truly knows how to unlock me 😉🫶</i>",
                 parse_mode="HTML"
             )
+        # Note: after correct, user must re-send the desired NSFW command.
 
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, nsfw_password_handler))
+    # Catch only plain text when awaiting_nsfw_password is True AND in private
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, nsfw_password_handler)
+    )
+
+    # /send broadcast command (secret; not added to command menu)
+    async def send_broadcast_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user = update.effective_user
+        chat_id = update.effective_chat.id
+
+        known_chats.add(chat_id)
+
+        user_id = user.id
+        if user_id not in ALLOWED_BROADCASTERS:
+            # Naughty pervy rejection
+            await update.message.reply_text(
+                "<i>Nice try, cutie. But only my Asad gets to press that button ❤️</i>",
+                parse_mode="HTML"
+            )
+            return
+
+        args = context.args
+        if not args:
+            await update.message.reply_text(
+                "<i>Usage: <code>/send Your broadcast message here</code></i>",
+                parse_mode="HTML"
+            )
+            return
+
+        broadcast_text = " ".join(args)
+        # Confirm to sender
+        await update.message.reply_text(
+            f"<b>Broadcasting to {len(known_chats)} chats...</b>",
+            parse_mode="HTML"
+        )
+        success = 0
+        fail = 0
+        for cid in list(known_chats):
+            try:
+                await context.bot.send_message(
+                    chat_id=cid,
+                    text=broadcast_text,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True
+                )
+                success += 1
+            except Exception as e:
+                logger.warning(f"Broadcast to {cid} failed: {e}")
+                fail += 1
+        await update.message.reply_text(
+            f"<b>Broadcast completed:</b> sent to {success} chats, failed for {fail}.",
+            parse_mode="HTML"
+        )
+
+    # Register send handler but do NOT add BotCommand for it in the menu
+    app.add_handler(CommandHandler('send', send_broadcast_handler))
 
 
 # ====== Worker Functions ======
@@ -999,19 +1087,22 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 # ====== Setup Bot Commands ======
 async def setup_bot_commands(app):
+    # Note: /send is NOT registered here, so it stays secret
     commands = [
         BotCommand('start', 'Start the bot'),
         BotCommand('help', 'Show help message'),
     ]
     for cat in SFW_CATEGORIES:
         commands.append(BotCommand(cat, f'Get a random {cat} image'))
+    # NSFW commands appear but require unlock in private:
     commands.append(BotCommand('nsfw', 'Get a random NSFW media'))
     commands.append(BotCommand('photo', 'Get a random NSFW photo'))
     commands.append(BotCommand('gif', 'Get a random NSFW GIF'))
     commands.append(BotCommand('video', 'Get a random NSFW video'))
+    # Do NOT include /send here.
 
     await app.bot.set_my_commands(commands)
-    logger.info("Bot commands set.")
+    logger.info("Bot commands set (excluding /send).")
 
 # ====== Main Runner ======
 async def main():
@@ -1044,7 +1135,7 @@ async def main():
     for _ in range(VIDEO_WORKERS):
         asyncio.create_task(video_worker())
 
-    logger.info("💞 Kushina Bot is now running.")
+    logger.info("💞 Kushina Sexy Baby Is Now Ready To Be Fucked So Hard.")
 
     # 5. Initialize and start application
     await app.initialize()
