@@ -427,9 +427,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Mention the user
     user_mention = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
 
-    # Send typing action
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
-
     # Keyboard buttons
     keyboard = [
         [
@@ -451,11 +448,40 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<b>🔥 Invite me to your group so everyone can join the excitement!</b>"
     )
 
-    await update.message.reply_text(
-        welcome_text,
-        reply_markup=reply_markup,
+    # List of 20 image URLs
+    image_urls = [
+        "https://i.postimg.cc/x841BwFW/New-Project-235-FFA9646.png",
+        "https://i.postimg.cc/5NC7HwSV/New-Project-235-A06-DD7-A.png",
+        "https://i.postimg.cc/HnPqpdm9/New-Project-235-9-E45-B87.png",
+        "https://i.postimg.cc/1tSPTmRg/New-Project-235-AB394-C0.png",
+        "https://i.postimg.cc/8ct1M2S7/New-Project-235-9-CAE309.png",
+        "https://i.postimg.cc/TYtwDDdt/New-Project-235-2-F658-B0.png",
+        "https://i.postimg.cc/xdwqdVfY/New-Project-235-68-BAF06.png",
+        "https://i.postimg.cc/hPczxn9t/New-Project-235-9-E9-A004.png",
+        "https://i.postimg.cc/jjFPQ1Rk/New-Project-235-A1-E7-CC1.png",
+        "https://i.postimg.cc/TPqJV0pz/New-Project-235-CA65155.png",
+        "https://i.postimg.cc/wBh0WHbb/New-Project-235-89799-CD.png",
+        "https://i.postimg.cc/FKdQ1fzk/New-Project-235-C377613.png",
+        "https://i.postimg.cc/rpKqWnnm/New-Project-235-CFD2548.png",
+        "https://i.postimg.cc/g0kn7HMF/New-Project-235-C4-A32-AC.png",
+        "https://i.postimg.cc/XY6jRkY1/New-Project-235-28-DCBC9.png",
+        "https://i.postimg.cc/SN32J9Nc/New-Project-235-99-D1478.png",
+        "https://i.postimg.cc/8C86n62T/New-Project-235-F1556-B9.png",
+        "https://i.postimg.cc/RCGwVqHT/New-Project-235-5-BBB339.png",
+        "https://i.postimg.cc/pTfYBZyN/New-Project-235-17-D796-A.png",
+        "https://i.postimg.cc/zGgdgJJc/New-Project-235-165-FE5-A.png"
+    ]
+
+    import random
+    image_url = random.choice(image_urls)
+
+    # Send photo with caption and buttons
+    await bot.send_photo(
+        chat_id=chat_id,
+        photo=image_url,
+        caption=welcome_text,
         parse_mode="HTML",
-        disable_web_page_preview=True
+        reply_markup=reply_markup
     )
 
 # ====== /help Command Handler (Kushina style) ======
