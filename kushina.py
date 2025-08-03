@@ -4,6 +4,7 @@ import random
 import re
 import asyncio
 import threading
+import time
 from urllib.parse import quote_plus, urlparse
 from typing import Optional, Tuple, List
 from io import BytesIO
@@ -15,13 +16,14 @@ from aiohttp import ClientTimeout, ClientResponseError
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, CallbackQuery
 from telegram.constants import ChatAction, ChatType
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    CallbackQueryHandler,
     filters
 )
 from telegram.error import BadRequest
@@ -202,6 +204,11 @@ MESSAGES = {
         "<b>📖 Kushina Commands</b>\n\n"
         "<i>Hey there! I'm <b>Kushina Uzumaki</b>—full of energy and always eager to help!</i>\n"
         "<i>Send one of these commands and I'll bring you an awesome anime image:</i>\n"
+    ),
+    'help_minimized': (
+        "<b>📖 Kushina Commands</b>\n\n"
+        "<i>Hey there! I'm <b>Kushina Uzumaki</b>—full of energy and always eager to help!</i>\n"
+        "<i>Click expand to see all my commands!</i>\n"
     ),
     'help_outro': (
         "\n<i>🤝 Invite me to your group so everyone can join the fun!</i>\n"
@@ -530,19 +537,79 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     
-    help_lines = [MESSAGES['help_intro']]
-    for cmd, desc in COMMANDS.items():
-        if cmd in ['start', 'help']:
-            continue
-        if cmd in ['nsfw', 'photo', 'gif', 'video']:
-            continue
-        help_lines.append(f"• <code>/{cmd}</code> — <b>{desc}</b>")
-    help_lines.append(MESSAGES['help_outro'])
+    # Start with minimized view
+    help_text = MESSAGES['help_minimized']
     
-    help_text = "\n".join(help_lines)
+    keyboard = [[InlineKeyboardButton("📋 Expand Commands", callback_data="expand_help")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
         help_text,
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+        reply_markup=reply_markup
+    )
+
+async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "expand_help":
+        # Build expanded help text
+        help_lines = [MESSAGES['help_intro']]
+        for cmd, desc in COMMANDS.items():
+            if cmd in ['start', 'help']:
+                continue
+            if cmd in ['nsfw', 'photo', 'gif', 'video']:
+                continue
+            help_lines.append(f"• <code>/{cmd}</code> — <b>{desc}</b>")
+        help_lines.append(MESSAGES['help_outro'])
+        
+        help_text = "\n".join(help_lines)
+        
+        keyboard = [[InlineKeyboardButton("📋 Minimize Commands", callback_data="minimize_help")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text=help_text,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=reply_markup
+        )
+    
+    elif query.data == "minimize_help":
+        help_text = MESSAGES['help_minimized']
+        
+        keyboard = [[InlineKeyboardButton("📋 Expand Commands", callback_data="expand_help")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            text=help_text,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=reply_markup
+        )
+
+# Ping command (not registered in command menu)
+async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    start_time = time.time()
+    
+    # Send initial message - reply in groups, direct in private
+    if update.effective_chat.type == ChatType.PRIVATE:
+        message = await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="🛰️ Pinging..."
+        )
+    else:
+        message = await update.message.reply_text("🛰️ Pinging...")
+    
+    # Calculate ping time
+    end_time = time.time()
+    ping_time = round((end_time - start_time) * 1000, 2)
+    
+    # Edit message with result and hyperlink
+    await message.edit_text(
+        f'🏓 <a href="https://t.me/SoulMeetsHQ">Pong!</a> {ping_time}ms',
         parse_mode="HTML",
         disable_web_page_preview=True
     )
@@ -1116,6 +1183,12 @@ def register_category_handlers(app):
     
     # Broadcast handler
     app.add_handler(CommandHandler('send', send_broadcast_handler))
+    
+    # Ping command (not registered in menu)
+    app.add_handler(CommandHandler('ping', ping_command))
+    
+    # Callback query handler for expand/minimize buttons
+    app.add_handler(CallbackQueryHandler(callback_handler))
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Exception in handler: {context.error}", exc_info=True)
@@ -1128,12 +1201,12 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 async def setup_bot_commands(app):
     commands = []
     for cmd, desc in COMMANDS.items():
-        if cmd == 'send':  # Skip secret command
+        if cmd in ['send', 'ping']:  # Skip secret commands
             continue
         commands.append(BotCommand(cmd, desc))
     
     await app.bot.set_my_commands(commands)
-    logger.info("Bot commands set (excluding /send).")
+    logger.info("Bot commands set (excluding /send and /ping).")
 
 # Main function
 async def main():
