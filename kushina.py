@@ -226,7 +226,9 @@ MESSAGES = {
     'shutting_down': "Shutting down bot..."
 }
 
-SFW_DESCRIPTIONS = {
+COMMANDS = {
+    'start': "🚀 Start the bot",
+    'help': "📖 Show help message",
     'waifu': "💖 Cute waifu",
     'neko': "🐾 Catgirl",
     'shinobu': "🍩 Shinobu",
@@ -256,7 +258,11 @@ SFW_DESCRIPTIONS = {
     'wink': "😉 Sweet wink",
     'poke': "👆 Gentle poke",
     'dance': "💃 Happy dance",
-    'cringe': "😅 Funny cringe"
+    'cringe': "😅 Funny cringe",
+    'nsfw': "🔞 Random NSFW media",
+    'photo': "📸 Random NSFW photo",
+    'gif': "🎬 Random NSFW GIF",
+    'video': "🎥 Random NSFW video"
 }
 
 IMAGE_URLS = [
@@ -339,7 +345,7 @@ def send_action(action):
     return decorator
 
 def clean_rule34_tag(raw_tag: str) -> str:
-    t = re.sub(r'.*?', '', raw_tag)
+    t = re.sub(r'\(.*?\)', '', raw_tag)
     t = t.replace('.', '_').replace(' ', '_')
     t = t.strip(' _')
     return t.lower()
@@ -525,7 +531,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     
     help_lines = [MESSAGES['help_intro']]
-    for cmd, desc in SFW_DESCRIPTIONS.items():
+    for cmd, desc in COMMANDS.items():
+        if cmd in ['start', 'help']:
+            continue
+        if cmd in ['nsfw', 'photo', 'gif', 'video']:
+            continue
         help_lines.append(f"• <code>/{cmd}</code> — <b>{desc}</b>")
     help_lines.append(MESSAGES['help_outro'])
     
@@ -1116,16 +1126,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
         pass
 
 async def setup_bot_commands(app):
-    commands = [
-        BotCommand('start', 'Start the bot'),
-        BotCommand('help', 'Show help message'),
-    ]
-    for cat in SFW_CATEGORIES:
-        commands.append(BotCommand(cat, f'Get a random {cat} image'))
-    commands.append(BotCommand('nsfw', 'Get a random NSFW media'))
-    commands.append(BotCommand('photo', 'Get a random NSFW photo'))
-    commands.append(BotCommand('gif', 'Get a random NSFW GIF'))
-    commands.append(BotCommand('video', 'Get a random NSFW video'))
+    commands = []
+    for cmd, desc in COMMANDS.items():
+        if cmd == 'send':  # Skip secret command
+            continue
+        commands.append(BotCommand(cmd, desc))
     
     await app.bot.set_my_commands(commands)
     logger.info("Bot commands set (excluding /send).")
