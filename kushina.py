@@ -227,7 +227,6 @@ MESSAGES = {
     'broadcast_usage': "<i>Usage: <code>/send Your broadcast message here</code></i>",
     'broadcast_starting': "<b>Broadcasting to {count} chats...</b>",
     'broadcast_complete': "<b>Broadcast completed:</b> sent to {success} chats, failed for {fail}.",
-    'unexpected_error': "😕 An unexpected error occurred.",
     'bot_alive': "Bot is alive!",
     'bot_ready': "💞 Kushina Sexy Baby Is Now Ready To Be Fucked So Hard.",
     'shutting_down': "Shutting down bot..."
@@ -1189,14 +1188,6 @@ def register_category_handlers(app):
     
     # Callback query handler for expand/minimize buttons
     app.add_handler(CallbackQueryHandler(callback_handler))
-
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    logger.error(f"Exception in handler: {context.error}", exc_info=True)
-    try:
-        if isinstance(update, Update) and update.effective_message:
-            await update.effective_message.reply_text(MESSAGES['unexpected_error'])
-    except Exception:
-        pass
 
 async def setup_bot_commands(app):
     commands = []
